@@ -1,0 +1,236 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+#include <time.h>
+#include <assert.h>
+#include <ctype.h>
+#include "htable.h"
+#include "mylib.h"
+
+/* -------------------------------------------------------*/
+/*                   Application class                    */
+/* -------------------------------------------------------*/
+
+/*Print function which is passed to htable_print to print out the
+ *hash-tables containers.
+ *Parameters: String.
+ *Return Value: Void.
+ */
+void print(char *str) {
+    fprintf(stdout, "%s ", str);  
+}
+
+/*A function that checks the validity of the input when using
+ *the provided -s flag.
+ */
+int contains_nums(char *str, int length){
+    int index = 0;
+    if(length == 1 && !isdigit(str[0])) return -1;
+    for(index = 0; index < length-1; index++) {
+        if(!isdigit(str[index])){
+                return -1;
+            }
+    }
+    return 1;
+}
+
+
+/*A function used to display a message to the user, when they
+  provide invalid input.
+*/
+char* print_help(char* layout) {
+    fprintf(stderr, "Oops, something went wrong with your input!\n");
+    fprintf(stderr, "\nExample usage:\n%s", layout);
+    fprintf(stderr, "Use -h as an argument for a list of argument "
+            "options.\n");
+    exit(EXIT_FAILURE);
+}
+    
+/*Main function that takes multiple arguments from the command line,
+ *in order to specify the information a user wishes to see.
+ *Parameters: integer argc, pointer to a pointer to a character argv.
+ *Return Value: integer specifying whether the program ran sucessfully.
+ *
+ *Description of command-line arguments:
+ *
+ *-h: Print help message.
+ *-s: Specify custom size for hash-table.
+ *-r: Use red-black trees as containers (default is flexarrays).
+ *-i: Print out information in regards to fill time, search time,
+ *    and number of unkown words found.
+ *-p: Print and exit program.
+ *
+ *Note:
+ *Sanity check ensures (i) user provided a file to read in,
+ *and (ii), the arguments the user provided are correct.
+ */
+int main(int argc, char **argv) {
+    FILE *infile = NULL;
+    int tablesize = 3877;
+    int custom_size = 0;
+    htable h1;
+    char word[256];
+    int r = 0;
+    int p = 0;
+    int s = 0;
+    int i = 0;
+    int h = 0;
+    int check = 0;
+    int index = 0;
+    clock_t start, end;
+    int result;
+    double filltime = 0;
+    double searchtime;
+    int unknown_words = 0;
+    char option;
+    static char layout[] = "/.asgn dictionary_name.txt"
+        " {arguments} < file_to_test.txt\n";
+ 
+    while((option = getopt(argc, argv, "rhpis:")) != EOF) {
+        switch (option) {
+            case 'r' :
+                r = 1;
+                break;
+
+            case 's':
+                s = 1;
+                /*Check used to ensure an integer argument
+                 *is provided when using '-s {int}', in order
+                 *to avoid a floating point exception.
+                 */
+                check = contains_nums(optarg, strlen(optarg));
+                if(check == 1) {
+                    s = 1;
+                    custom_size = atoi(optarg);
+                    } else {
+                    fprintf(stderr,"The argument s requires an "
+                            "integer parameter i.e. {-s 100}.\n");
+                    exit(EXIT_FAILURE);
+                    }
+                break;
+
+            case 'p':
+                p=1;
+                break;         
+
+            case 'i':
+                i = 1;
+                break;
+
+            case 'h':
+                h = 1;
+                break;
+                
+            case ':':
+                fprintf(stderr, "option -%c requires argument\n", optopt);
+                break;
+
+            default: fprintf(stderr, "\nExample usage:\n%s", layout);
+                exit(EXIT_FAILURE);
+        }   
+    }
+    
+    if(h == 1) {
+        printf("(i) Use [-s *int argument*] for custom size.\n");
+        printf("(ii) Use [-r] to specify that you wish the hash-table");
+        printf(" to be built using red-black trees as containers,");
+        printf(" else the program will automatically assign flex-array's");
+        printf(" to be used.\n");
+        printf("(iii) Use [-i] to print out information regarding the fill");
+        printf(" time and search time, as well as number of unknown words.\n");
+        printf("(iv) Use [-p] to print out the filled hash-table.\n");
+        exit(EXIT_SUCCESS);
+    }
+            
+    /*-------Sanity checks--------*/
+    /*If user provided no command line arguments when
+     *running the program, print help and exit.
+     */
+    if(argc == optind) {
+        print_help(layout);
+    }
+
+    /*If the infile is null print a message displaying
+     *that it cannot be found to the user, print help
+     *and exit.
+     */
+    if(optind < argc) {
+        if(NULL == (infile = fopen(argv[optind], "r"))) {
+            fprintf(stderr, "Cannot Find Dictionary File!\n");
+            print_help(layout);
+        }
+    }
+
+    /*If the user fails to provide a file to be read in as
+      a dictionary, print help and exit.
+    */
+    for(index = optind; index < argc; index++) {
+        if(strstr(argv[index], ".txt") == NULL) {
+            print_help(layout);
+        } 
+    }
+                 
+    if(s == 1) {
+        h1 = htable_new(custom_size);
+    } else {
+        h1 = htable_new(tablesize);
+    }
+    
+    if(r == 1 && i != 1) {
+        while(getword(word, sizeof word, infile) != EOF){
+            htable_insert(h1, word, 'r');  
+        }
+
+    } else if (r != 1 && i != 1) {
+        while(getword(word, sizeof word, infile) != EOF){
+            htable_insert(h1, word, 'f');  
+        }
+    }         
+    
+    if(i == 1 && r == 1) {
+        start = clock();
+        while(getword(word, sizeof word, infile) != EOF){
+            htable_insert(h1, word, 'r');  
+        }
+        end = clock();
+        filltime = (end-start)/(double)CLOCKS_PER_SEC;
+                    
+        
+    } else if (i == 1 && r != 1) {
+        start = clock();
+        while(getword(word, sizeof word, infile) != EOF){
+            htable_insert(h1, word, 'f');  
+        }
+        end = clock();
+        filltime = (end-start)/(double)CLOCKS_PER_SEC;
+    }
+    fclose(infile);
+
+    if(p == 1) {
+        htable_print(h1, print);
+        htable_free(h1);
+        exit(EXIT_SUCCESS);
+    }
+                
+    start = clock();
+    while(getword(word, sizeof word, stdin) != EOF){
+        result = htable_search(h1, word);
+        if(result == 0){
+            unknown_words++;
+            printf("Did not find: %s\n" , word);
+        }
+    }
+    end = clock();
+    searchtime = (end-start)/(double)CLOCKS_PER_SEC;
+
+    if(i == 1) {
+        printf("Fill time : %f\n", filltime);
+        printf("Search time : %f\n", searchtime);
+        printf("Unknown words : %d\n", unknown_words);
+                    
+    }
+    htable_free(h1);
+    return EXIT_SUCCESS;
+}                  
+                

@@ -1,0 +1,126 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "htable.h"
+#include <string.h>
+#include "mylib.h"
+#include "container.h"
+
+/* -------------------------------------------------------*/
+/*                   htable class                         */
+/*       Authors: Baz Peden, Harry Ellerm, Sophia Pi.     */
+/* -------------------------------------------------------*/
+
+/*A struct for a hashtable that has an associated capacity
+ *and a pointer to a collection of containers.
+ */
+struct htablerec {
+    int capacity;
+    container *c;
+};
+
+/*Method that creates a new hashtable by creating an array of
+ *container pointers.
+ *Param: capacity, the capacity value for allocating the hashtable
+ *Returns the new hashtable
+ */
+htable htable_new(int capacity) {
+    int i;
+    htable result = emalloc(sizeof *result);
+    result->capacity = capacity;
+    result->c = emalloc(result->capacity * sizeof (container*));
+    for(i = 0; i < result->capacity; i++) {
+        result->c[i] = NULL;
+    }
+    return result;
+}
+
+/*Method that reallocates the memory inside a hashtable.
+ *Param: capacity, the capacity value for allocating the hashtable
+ *Returns the new hashtable.
+ */
+htable htable_realloc(htable h1, int new_capacity) {
+    int i = 0;
+    h1->capacity = new_capacity;
+    h1->c = realloc(h1->c, h1->capacity * sizeof (container*));
+    for(i = 0; i < h1->capacity; i++) {
+        h1->c[i] = NULL;
+    }
+    return h1;
+}
+
+/*Method that frees memory associated with the hash table.
+ *param: h, the hashtable.
+ */
+void htable_free(htable h) {
+    int i;
+    for(i = 0; i < h->capacity; i++) {
+        if(h->c[i] != NULL) {
+            container_free(h->c[i]);
+            
+        }
+    }
+    free(h->c);
+    free(h);
+}
+
+/*A Hashing Method that converts the word to an integer.
+ *Param: *word, word that needs to be hashed
+ *Param: h, the hashtable
+ *Returns the an unsigned integer that will be used for hashing 
+ */
+unsigned int htable_word_to_int(char *word, htable h){
+    unsigned int result = 0;
+
+    while(*word != '\0') {
+        result = (*word++ + 31*result);
+    }
+    return result % h->capacity;
+}
+
+/*A method that inserts a word into the hashtable.
+ *Param: h, the hash table
+ *Param: *str, the word to be inserted
+ *Param: type, describes whether it is going to add a RBT
+ *or a flexarray.
+ */
+void htable_insert(htable h, char *str, char type) {
+    unsigned int result = htable_word_to_int(str, h);
+   
+    if(h->c[result] == NULL) {
+        h->c[result] = container_new(type);
+        container_add(h->c[result], str);
+        
+    } else {
+        container_add(h->c[result], str);
+    }
+}
+
+/*Method that searches for a particular word in the hash table.
+ *Param: the hash table (type h)
+ *Param: key, the word we want to search for (type char*)
+ *Returns 0 if the hashtable does not contain the word
+ */
+int htable_search(htable h, char* key) {
+    unsigned int result = htable_word_to_int(key, h);
+    if(h->c[result] == NULL) {
+        return 0;
+    } else {
+        return container_search(h->c[result], key);
+    }
+    return -1;
+}
+
+/*Method that prints the hash table
+ *Param: h, the hash table
+ *Param: f, the function passed through the method 
+ */
+void htable_print(htable h, void f(char *s )){
+    int index;
+    for(index = 0; index < h->capacity; index++) {
+        if(h->c[index] != NULL) {
+            container_print(h->c[index], index, f);
+            printf("\n");
+        }                   
+    }
+}   
+
